@@ -1,5 +1,4 @@
 ﻿---
 BasedOnStyle: Google
-IndentWidth: '2'
-
-...
+IndentWidth: "2"
+ColumnLimit: 110
