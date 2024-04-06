@@ -2,3 +2,4 @@ main
 *.o
 *.so
 *.DS_Store
+__pycache__

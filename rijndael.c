@@ -4,6 +4,7 @@
  *
  */
 
+#include <stdio.h>
 #include <stdlib.h>
 // TODO: Any other files you need to include should go here
 
@@ -83,7 +84,13 @@ static const char inv_s_box[16][16] = {
  * Operations used when encrypting a block
  */
 void sub_bytes(unsigned char *block) {
-  // TODO: Implement me!
+  for (int i = 0; i < 16; i++) {
+    unsigned char c = block[i];
+    unsigned char x = c >> 4;
+    unsigned char y = c & 0xF;
+    unsigned char sub = s_box[x][y];
+    block[i] = sub;
+  }
 }
 
 void shift_rows(unsigned char *block) {
