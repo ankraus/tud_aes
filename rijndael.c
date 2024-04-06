@@ -73,7 +73,13 @@ void mix_columns(unsigned char *block) {
  * Operations used when decrypting a block
  */
 void invert_sub_bytes(unsigned char *block) {
-  // TODO: Implement me!
+  for (int i = 0; i < 16; i++) {
+    unsigned char c = block[i];
+    unsigned char x = c >> 4;
+    unsigned char y = c & 0xF;
+    unsigned char inv = inv_s_box[x][y];
+    block[i] = inv;
+  }
 }
 
 void invert_shift_rows(unsigned char *block) {
