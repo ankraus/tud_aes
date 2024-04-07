@@ -51,3 +51,4 @@ def test_shift_rows():
     shift_rows(py_buffer)
     print(list([c for a in py_buffer for c in a]))
     assert [c for a in py_buffer for c in a] == list(c_buffer[:-1])
+    assert list(c_buffer[:-1]) != list(gen_c_buffer()[:-1])
