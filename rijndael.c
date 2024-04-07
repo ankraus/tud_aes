@@ -61,8 +61,24 @@ void sub_bytes(unsigned char *block) {
   }
 }
 
+void shift_row(unsigned char *block, int row, int shift) {
+  unsigned char *shifted_row = (unsigned char *)malloc(4 * sizeof(unsigned char));
+  for (int i = 0; i < 4; i++) {
+    int j = i - shift;
+    if (j < 0) {
+      j += 4;
+    }
+    shifted_row[j] = block[row + i * 4];
+  }
+  for (int i = 0; i < 4; i++) {
+    block[row + i * 4] = shifted_row[i];
+  }
+}
+
 void shift_rows(unsigned char *block) {
-  // TODO: Implement me!
+  shift_row(block, 1, 1);
+  shift_row(block, 2, 2);
+  shift_row(block, 3, 3);
 }
 
 void mix_columns(unsigned char *block) {
