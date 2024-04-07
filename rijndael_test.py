@@ -1,5 +1,12 @@
 import ctypes
-from aes.aes import inv_shift_rows, mix_columns, sub_bytes, inv_sub_bytes, shift_rows
+from aes.aes import (
+    inv_mix_columns,
+    inv_shift_rows,
+    mix_columns,
+    sub_bytes,
+    inv_sub_bytes,
+    shift_rows,
+)
 
 rijndael = ctypes.CDLL("./rijndael.so")
 
@@ -82,3 +89,16 @@ def test_mix_columns():
     mix_columns(py_buffer)
     assert buffers_match(py_buffer, c_buffer)
     assert not buffer_matches_original(c_buffer)
+
+
+def test_inv_mix_columns():
+    c_buffer = gen_c_buffer()
+    py_buffer = gen_py_buffer()
+    rijndael.mix_columns(c_buffer)
+    mix_columns(py_buffer)
+    assert buffers_match(py_buffer, c_buffer)
+    assert not buffer_matches_original(c_buffer)
+    rijndael.invert_mix_columns(c_buffer)
+    inv_mix_columns(py_buffer)
+    assert buffers_match(py_buffer, c_buffer)
+    assert buffer_matches_original(c_buffer)
