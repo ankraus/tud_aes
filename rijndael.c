@@ -116,7 +116,6 @@ void mix_single_column(unsigned char *column) {
 }
 
 void mix_columns(unsigned char *block) {
-  printf("\n");
   for (int i = 0; i < 4; i++) {
     unsigned char *col = extract_column(block, i);
     mix_single_column(col);
