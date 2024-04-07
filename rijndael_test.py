@@ -43,12 +43,7 @@ def test_inv_sub_bytes():
 def test_shift_rows():
     c_buffer = gen_c_buffer()
     py_buffer = gen_py_buffer()
-    print(list(c_buffer[:-1]))
     rijndael.shift_rows(c_buffer)
-    print(list(c_buffer[:-1]))
-    print("\n")
-    print(list([c for a in py_buffer for c in a]))
     shift_rows(py_buffer)
-    print(list([c for a in py_buffer for c in a]))
     assert [c for a in py_buffer for c in a] == list(c_buffer[:-1])
     assert list(c_buffer[:-1]) != list(gen_c_buffer()[:-1])
