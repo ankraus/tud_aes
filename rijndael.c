@@ -84,8 +84,44 @@ void shift_rows(unsigned char *block) {
   shift_row(block, 3, 3);
 }
 
+unsigned char *extract_column(unsigned char *block, int col) {
+  unsigned char *column = (unsigned char *)malloc(4 * sizeof(unsigned char));
+  for (int i = 0; i < 4; i++) {
+    column[i] = block[i + col * 4];
+  }
+  return column;
+}
+
+void insert_column(unsigned char *block, unsigned char *column, int col) {
+  for (int i = 0; i < 4; i++) {
+    block[i + col * 4] = column[i];
+  }
+}
+
+unsigned char xtime(unsigned char x) {
+  if (x & 0x80) {
+    return ((x << 1) ^ 0x1B) & 0xFF;
+  } else {
+    return (x << 1) & 0xFF;
+  }
+}
+
+void mix_single_column(unsigned char *column) {
+  unsigned char t = column[0] ^ column[1] ^ column[2] ^ column[3];
+  unsigned char u = column[0];
+  column[0] ^= t ^ xtime(column[0] ^ column[1]);
+  column[1] ^= t ^ xtime(column[1] ^ column[2]);
+  column[2] ^= t ^ xtime(column[2] ^ column[3]);
+  column[3] ^= t ^ xtime(column[3] ^ u);
+}
+
 void mix_columns(unsigned char *block) {
-  // TODO: Implement me!
+  printf("\n");
+  for (int i = 0; i < 4; i++) {
+    unsigned char *col = extract_column(block, i);
+    mix_single_column(col);
+    insert_column(block, col, i);
+  }
 }
 
 /*
