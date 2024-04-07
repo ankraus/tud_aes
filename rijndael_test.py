@@ -19,12 +19,21 @@ def gen_c_buffer():
     return ctypes.create_string_buffer(buffer)
 
 
+def buffers_match(py_buffer, c_buffer):
+    return [c for a in py_buffer for c in a] == list(c_buffer[:-1])
+
+
+def buffer_matches_original(c_buffer):
+    return list(c_buffer) == list(gen_c_buffer())
+
+
 def test_sub_bytes():
     c_buffer = gen_c_buffer()
     py_buffer = gen_py_buffer()
     rijndael.sub_bytes(c_buffer)
     sub_bytes(py_buffer)
-    assert [c for a in py_buffer for c in a] == list(c_buffer[:-1])
+    assert buffers_match(py_buffer, c_buffer)
+    assert not buffer_matches_original(c_buffer)
 
 
 def test_inv_sub_bytes():
@@ -32,12 +41,12 @@ def test_inv_sub_bytes():
     py_buffer = gen_py_buffer()
     rijndael.sub_bytes(c_buffer)
     sub_bytes(py_buffer)
-    assert [c for a in py_buffer for c in a] == list(c_buffer[:-1])
-    assert list(c_buffer) != list(gen_c_buffer())
+    assert buffers_match(py_buffer, c_buffer)
+    assert not buffer_matches_original(c_buffer)
     rijndael.invert_sub_bytes(c_buffer)
     inv_sub_bytes(py_buffer)
-    assert [c for a in py_buffer for c in a] == list(c_buffer[:-1])
-    assert list(c_buffer) == list(gen_c_buffer())
+    assert buffers_match(py_buffer, c_buffer)
+    assert buffer_matches_original(c_buffer)
 
 
 def test_shift_rows():
@@ -45,5 +54,6 @@ def test_shift_rows():
     py_buffer = gen_py_buffer()
     rijndael.shift_rows(c_buffer)
     shift_rows(py_buffer)
-    assert [c for a in py_buffer for c in a] == list(c_buffer[:-1])
-    assert list(c_buffer[:-1]) != list(gen_c_buffer()[:-1])
+    assert buffers_match(py_buffer, c_buffer)
+    assert not buffer_matches_original(c_buffer)
+
