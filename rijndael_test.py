@@ -20,10 +20,14 @@ def gen_c_buffer():
 
 
 def buffers_match(py_buffer, c_buffer):
+    print([c for a in py_buffer for c in a])
+    print(list(c_buffer[:-1]))
     return [c for a in py_buffer for c in a] == list(c_buffer[:-1])
 
 
 def buffer_matches_original(c_buffer):
+    print(list(gen_c_buffer()[:-1]))
+    print(list(c_buffer[:-1]))
     return list(c_buffer) == list(gen_c_buffer())
 
 
