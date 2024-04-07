@@ -62,12 +62,15 @@ void sub_bytes(unsigned char *block) {
 }
 
 void shift_row(unsigned char *block, int row, int shift) {
+  // create tmp buffer to store shifted row
   unsigned char *shifted_row = (unsigned char *)malloc(4 * sizeof(unsigned char));
   for (int i = 0; i < 4; i++) {
     int j = i - shift;
     if (j < 0) {
       j += 4;
     }
+    // make sure shifting works in both directions
+    j %= 4;
     shifted_row[j] = block[row + i * 4];
   }
   for (int i = 0; i < 4; i++) {
@@ -99,7 +102,9 @@ void invert_sub_bytes(unsigned char *block) {
 }
 
 void invert_shift_rows(unsigned char *block) {
-  // TODO: Implement me!
+  shift_row(block, 1, -1);
+  shift_row(block, 2, -2);
+  shift_row(block, 3, -3);
 }
 
 void invert_mix_columns(unsigned char *block) {
