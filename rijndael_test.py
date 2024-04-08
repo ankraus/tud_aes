@@ -26,6 +26,10 @@ def gen_c_buffer():
     return ctypes.create_string_buffer(buffer)
 
 
+def gen_buffers():
+    return (gen_c_buffer(), gen_py_buffer())
+
+
 def buffers_match(py_buffer, c_buffer):
     print([c for a in py_buffer for c in a])
     print(list(c_buffer[:-1]))
@@ -39,8 +43,7 @@ def buffer_matches_original(c_buffer):
 
 
 def test_sub_bytes():
-    c_buffer = gen_c_buffer()
-    py_buffer = gen_py_buffer()
+    c_buffer, py_buffer = gen_buffers()
     rijndael.sub_bytes(c_buffer)
     sub_bytes(py_buffer)
     assert buffers_match(py_buffer, c_buffer)
@@ -48,8 +51,7 @@ def test_sub_bytes():
 
 
 def test_inv_sub_bytes():
-    c_buffer = gen_c_buffer()
-    py_buffer = gen_py_buffer()
+    c_buffer, py_buffer = gen_buffers()
     rijndael.sub_bytes(c_buffer)
     sub_bytes(py_buffer)
     assert buffers_match(py_buffer, c_buffer)
@@ -61,8 +63,7 @@ def test_inv_sub_bytes():
 
 
 def test_shift_rows():
-    c_buffer = gen_c_buffer()
-    py_buffer = gen_py_buffer()
+    c_buffer, py_buffer = gen_buffers()
     rijndael.shift_rows(c_buffer)
     shift_rows(py_buffer)
     assert buffers_match(py_buffer, c_buffer)
@@ -70,8 +71,7 @@ def test_shift_rows():
 
 
 def test_inv_shift_rows():
-    c_buffer = gen_c_buffer()
-    py_buffer = gen_py_buffer()
+    c_buffer, py_buffer = gen_buffers()
     rijndael.shift_rows(c_buffer)
     shift_rows(py_buffer)
     assert buffers_match(py_buffer, c_buffer)
@@ -83,8 +83,7 @@ def test_inv_shift_rows():
 
 
 def test_mix_columns():
-    c_buffer = gen_c_buffer()
-    py_buffer = gen_py_buffer()
+    c_buffer, py_buffer = gen_buffers()
     rijndael.mix_columns(c_buffer)
     mix_columns(py_buffer)
     assert buffers_match(py_buffer, c_buffer)
@@ -92,8 +91,7 @@ def test_mix_columns():
 
 
 def test_inv_mix_columns():
-    c_buffer = gen_c_buffer()
-    py_buffer = gen_py_buffer()
+    c_buffer, py_buffer = gen_buffers()
     rijndael.mix_columns(c_buffer)
     mix_columns(py_buffer)
     assert buffers_match(py_buffer, c_buffer)
