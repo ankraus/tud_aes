@@ -1,5 +1,8 @@
 import ctypes
+import os
 from aes.aes import (
+    add_round_key,
+    bytes2matrix,
     inv_mix_columns,
     inv_shift_rows,
     mix_columns,
@@ -28,6 +31,13 @@ def gen_c_buffer():
 
 def gen_buffers():
     return (gen_c_buffer(), gen_py_buffer())
+
+
+def gen_keys():
+    key = os.urandom(16)
+    py_key = bytes2matrix(key)
+    c_key = ctypes.create_string_buffer(key)
+    return (c_key, py_key)
 
 
 def buffers_match(py_buffer, c_buffer):
@@ -100,3 +110,12 @@ def test_inv_mix_columns():
     inv_mix_columns(py_buffer)
     assert buffers_match(py_buffer, c_buffer)
     assert buffer_matches_original(c_buffer)
+
+
+def test_add_round_key():
+    c_buffer, py_buffer = gen_buffers()
+    c_key, py_key = gen_keys()
+    rijndael.add_round_key(c_buffer, c_key)
+    add_round_key(py_buffer, py_key)
+    assert buffers_match(py_buffer, c_buffer)
+    assert not buffer_matches_original(c_buffer)

@@ -160,7 +160,9 @@ void invert_mix_columns(unsigned char *block) {
  * This operation is shared between encryption and decryption
  */
 void add_round_key(unsigned char *block, unsigned char *round_key) {
-  // TODO: Implement me!
+  for (int i = 0; i < 16; i++) {
+    block[i] ^= round_key[i];
+  }
 }
 
 /*
