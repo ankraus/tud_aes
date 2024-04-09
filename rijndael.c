@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 // TODO: Any other files you need to include should go here
 
 #include "rijndael.h"
@@ -84,17 +85,17 @@ void shift_rows(unsigned char *block) {
   shift_row(block, 3, 3);
 }
 
-unsigned char *extract_column(unsigned char *block, int col) {
-  unsigned char *column = (unsigned char *)malloc(4 * sizeof(unsigned char));
-  for (int i = 0; i < 4; i++) {
-    column[i] = block[i + col * 4];
+unsigned char *extract_column(unsigned char *block, int col, int block_width, int column_height) {
+  unsigned char *column = (unsigned char *)malloc(column_height * sizeof(unsigned char));
+  for (int i = 0; i < column_height; i++) {
+    column[i] = block[col + i * block_width];
   }
   return column;
 }
 
-void insert_column(unsigned char *block, unsigned char *column, int col) {
-  for (int i = 0; i < 4; i++) {
-    block[i + col * 4] = column[i];
+void insert_column(unsigned char *block, unsigned char *column, int col, int block_width, int column_height) {
+  for (int i = 0; i < column_height; i++) {
+    block[col + i * block_width] = column[i];
   }
 }
 
@@ -117,9 +118,9 @@ void mix_single_column(unsigned char *column) {
 
 void mix_columns(unsigned char *block) {
   for (int i = 0; i < 4; i++) {
-    unsigned char *col = extract_column(block, i);
+    unsigned char *col = extract_column(block, i, 4, 4);
     mix_single_column(col);
-    insert_column(block, col, i);
+    insert_column(block, col, i, 4, 4);
   }
 }
 
@@ -144,14 +145,14 @@ void invert_shift_rows(unsigned char *block) {
 
 void invert_mix_columns(unsigned char *block) {
   for (int i = 0; i < 4; i++) {
-    unsigned char *column = extract_column(block, i);
+    unsigned char *column = extract_column(block, i, 4, 4);
     unsigned char u = xtime(xtime(column[0] ^ column[2]));
     unsigned char v = xtime(xtime(column[1] ^ column[3]));
     column[0] ^= u;
     column[1] ^= v;
     column[2] ^= u;
     column[3] ^= v;
-    insert_column(block, column, i);
+    insert_column(block, column, i, 4, 4);
   }
   mix_columns(block);
 }
@@ -165,14 +166,58 @@ void add_round_key(unsigned char *block, unsigned char *round_key) {
   }
 }
 
+unsigned char rcon[32] = {
+    0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1B, 0x36, 0x6C, 0xD8, 0xAB, 0x4D, 0x9A,
+    0x2F, 0x5E, 0xBC, 0x63, 0xC6, 0x97, 0x35, 0x6A, 0xD4, 0xB3, 0x7D, 0xFA, 0xEF, 0xC5, 0x91, 0x39,
+};
+
+unsigned char *rot_word(unsigned char *word) {
+  unsigned char *rotated_word = (unsigned char *)malloc(4 * sizeof(unsigned char));
+  rotated_word[0] = word[1];
+  rotated_word[1] = word[2];
+  rotated_word[2] = word[3];
+  rotated_word[3] = word[0];
+  return rotated_word;
+}
+
+unsigned char *xor_bytes(const unsigned char *a, const unsigned char *b, int length) {
+  unsigned char *result = malloc(length);
+  for (int i = 0; i < length; i++) {
+    result[i] = a[i] ^ b[i];
+  }
+  return result;
+}
+
 /*
  * This function should expand the round key. Given an input,
  * which is a single 128-bit key, it should return a 176-byte
  * vector, containing the 11 round keys one after the other
  */
 unsigned char *expand_key(unsigned char *cipher_key) {
-  // TODO: Implement me!
-  return 0;
+  unsigned short num_rounds = 10;
+  unsigned char *round_keys = (unsigned char *)malloc(16 * (num_rounds + 1) * sizeof(unsigned char));
+  memcpy(round_keys, cipher_key, 16);
+  for (int i = 16; i < (num_rounds * 16) + 16; i += 4) {
+    unsigned char *word = (unsigned char *)malloc(4 * sizeof(unsigned char));
+    unsigned char *w1 = &round_keys[i - 4];
+    unsigned char *w4 = &round_keys[i - 16];
+    memcpy(word, w1, 4);
+    if (i % 16 == 0) {
+      unsigned char *rot_w1 = rot_word(w1);
+      for (int j = 0; j < 4; j++) {
+        unsigned char c = rot_w1[j];
+        unsigned char x = c >> 4;
+        unsigned char y = c & 0xF;
+        unsigned char sub = s_box[x][y];
+        rot_w1[j] = sub;
+      }
+      rot_w1[0] ^= rcon[i / 16];
+      word = rot_w1;
+    }
+    unsigned char *xored_word = xor_bytes(word, w4, 4);
+    memcpy(&round_keys[i], xored_word, 4);
+  }
+  return round_keys;
 }
 
 /*
