@@ -145,14 +145,14 @@ void invert_shift_rows(unsigned char *block) {
 
 void invert_mix_columns(unsigned char *block) {
   for (int i = 0; i < 4; i++) {
-    unsigned char *column = extract_column(block, i, 4, 4);
+    unsigned char *column = &block[i * 4];
     unsigned char u = xtime(xtime(column[0] ^ column[2]));
     unsigned char v = xtime(xtime(column[1] ^ column[3]));
     column[0] ^= u;
     column[1] ^= v;
     column[2] ^= u;
     column[3] ^= v;
-    insert_column(block, column, i, 4, 4);
+    memcpy(&block[i * 4], column, 4);
   }
   mix_columns(block);
 }
