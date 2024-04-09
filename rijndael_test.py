@@ -111,7 +111,7 @@ def test_add_round_key():
     for _ in range(3):
         c_buffer, py_buffer, original_c_buffer = gen_buffers()
         c_key, py_key = gen_keys()
-        rijndael.add_round_key(c_buffer[:-1], c_key)
+        rijndael.add_round_key(c_buffer, c_key)
         add_round_key(py_buffer, py_key)
         assert buffers_match(c_buffer[:-1], py_buffer)
         assert not c_buffers_match(original_c_buffer, c_buffer)
