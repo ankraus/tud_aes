@@ -118,9 +118,9 @@ void mix_single_column(unsigned char *column) {
 
 void mix_columns(unsigned char *block) {
   for (int i = 0; i < 4; i++) {
-    unsigned char *col = extract_column(block, i, 4, 4);
+    unsigned char *col = &block[i * 4];
     mix_single_column(col);
-    insert_column(block, col, i, 4, 4);
+    memcpy(&block[i * 4], col, 4);
   }
 }
 
