@@ -142,3 +142,21 @@ def test_encrypt_block():
         py_encrypted = py_aes.encrypt_block(matrix2bytes(py_buffer))
         c_encrypted = ctypes.string_at(pointer, 16)
         assert buffers_match(c_encrypted, bytes2matrix(py_encrypted))
+
+
+def test_decrypt_block():
+    for _ in range(3):
+        c_buffer, py_buffer, original_c_buffer = gen_buffers()
+        c_key, py_key = gen_keys()
+        py_aes = AES(matrix2bytes(py_key))
+        rijndael.aes_encrypt_block.restype = ctypes.c_void_p
+        pointer = rijndael.aes_encrypt_block(c_buffer, c_key)
+        py_encrypted = py_aes.encrypt_block(matrix2bytes(py_buffer))
+        c_encrypted = ctypes.string_at(pointer, 16)
+        assert buffers_match(c_encrypted, bytes2matrix(py_encrypted))
+
+        rijndael.aes_decrypt_block.restype = ctypes.c_void_p
+        pointer = rijndael.aes_decrypt_block(c_encrypted, c_key)
+        py_decrypted = py_aes.decrypt_block(py_encrypted)
+        c_decrypted = ctypes.string_at(pointer, 16)
+        assert buffers_match(c_decrypted, bytes2matrix(py_decrypted))
