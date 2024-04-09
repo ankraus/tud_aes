@@ -130,3 +130,15 @@ def test_expand_key():
             for x in mat:
                 expanded_py_key.append([y for y in x])
         assert buffers_match(expanded_c_key, expanded_py_key)
+
+
+def test_encrypt_block():
+    for _ in range(3):
+        c_buffer, py_buffer, _ = gen_buffers()
+        c_key, py_key = gen_keys()
+        py_aes = AES(matrix2bytes(py_key))
+        rijndael.aes_encrypt_block.restype = ctypes.c_void_p
+        pointer = rijndael.aes_encrypt_block(c_buffer, c_key)
+        py_encrypted = py_aes.encrypt_block(matrix2bytes(py_buffer))
+        c_encrypted = ctypes.string_at(pointer, 16)
+        assert buffers_match(c_encrypted, bytes2matrix(py_encrypted))
