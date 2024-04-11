@@ -134,7 +134,7 @@ def test_expand_key():
 
 def test_encrypt_block():
     for _ in range(3):
-        c_buffer, py_buffer, _ = gen_buffers()
+        c_buffer, py_buffer, original_c_buffer = gen_buffers()
         c_key, py_key = gen_keys()
         py_aes = AES(matrix2bytes(py_key))
         rijndael.aes_encrypt_block.restype = ctypes.c_void_p
@@ -142,6 +142,8 @@ def test_encrypt_block():
         py_encrypted = py_aes.encrypt_block(matrix2bytes(py_buffer))
         c_encrypted = ctypes.string_at(pointer, 16)
         assert buffers_match(c_encrypted, bytes2matrix(py_encrypted))
+        # ensure the encrypted data is different from the original data
+        assert not c_buffers_match(c_encrypted, original_c_buffer)
 
 
 def test_decrypt_block():
@@ -160,3 +162,12 @@ def test_decrypt_block():
         py_decrypted = py_aes.decrypt_block(py_encrypted)
         c_decrypted = ctypes.string_at(pointer, 16)
         assert buffers_match(c_decrypted, bytes2matrix(py_decrypted))
+        # make sure the original data is present after decryption
+        assert c_buffers_match(c_decrypted, original_c_buffer[:-1])
+
+        wrong_key, _ = (
+            gen_keys()
+        )  # make sure that the payload cannot be encrypted with the wrong key
+        pointer = rijndael.aes_decrypt_block(c_encrypted, wrong_key)
+        c_decrypted_wrong = ctypes.string_at(pointer, 16)
+        assert not c_buffers_match(c_decrypted, c_decrypted_wrong)
