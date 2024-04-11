@@ -4,13 +4,14 @@
  *
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-// TODO: Any other files you need to include should go here
-
 #include "rijndael.h"
 
+#include <stdlib.h>
+#include <string.h>
+
+/*
+ * Bytes for sub_bytes function
+ */
 static const unsigned char s_box[16][16] = {
     {0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76},
     {0xCA, 0x82, 0xC9, 0x7D, 0xFA, 0x59, 0x47, 0xF0, 0xAD, 0xD4, 0xA2, 0xAF, 0x9C, 0xA4, 0x72, 0xC0},
@@ -30,6 +31,9 @@ static const unsigned char s_box[16][16] = {
     {0x8C, 0xA1, 0x89, 0x0D, 0xBF, 0xE6, 0x42, 0x68, 0x41, 0x99, 0x2D, 0x0F, 0xB0, 0x54, 0xBB, 0x16},
 };
 
+/*
+ * Bytes for invert_sub_bytes function
+ */
 static const unsigned char inv_s_box[16][16] = {
     {0x52, 0x09, 0x6A, 0xD5, 0x30, 0x36, 0xA5, 0x38, 0xBF, 0x40, 0xA3, 0x9E, 0x81, 0xF3, 0xD7, 0xFB},
     {0x7C, 0xE3, 0x39, 0x82, 0x9B, 0x2F, 0xFF, 0x87, 0x34, 0x8E, 0x43, 0x44, 0xC4, 0xDE, 0xE9, 0xCB},
@@ -50,55 +54,71 @@ static const unsigned char inv_s_box[16][16] = {
 };
 
 /*
+ * Round constant for key expansion
+ */
+unsigned char rcon[32] = {
+    0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1B, 0x36, 0x6C, 0xD8, 0xAB, 0x4D, 0x9A,
+    0x2F, 0x5E, 0xBC, 0x63, 0xC6, 0x97, 0x35, 0x6A, 0xD4, 0xB3, 0x7D, 0xFA, 0xEF, 0xC5, 0x91, 0x39,
+};
+
+/*
  * Operations used when encrypting a block
+ */
+
+/*
+ * This function subsitutes bytes in the block with those in the s_box
+ * Each unsigned char of the block is split, with the first four bits denoting
+ * the x position in the s_box and the last four bits denoting the y position
  */
 void sub_bytes(unsigned char *block) {
   for (int i = 0; i < 16; i++) {
     unsigned char c = block[i];
-    unsigned char x = c >> 4;
-    unsigned char y = c & 0xF;
+    unsigned char x = c >> 4;   // access first four bits
+    unsigned char y = c & 0xF;  // access last four bits
     unsigned char sub = s_box[x][y];
-    block[i] = sub;
+    block[i] = sub;  // subsitute value in block with value from s_box
   }
 }
 
+/*
+ * This function executes the shift_rows step of the encryption. It takes a
+ * reference to the block, the row index and how much that row should be
+ * shifted.
+ */
 void shift_row(unsigned char *block, int row, int shift) {
-  // create tmp buffer to store shifted row
+  // allocate memory to store shifted row
   unsigned char *shifted_row = (unsigned char *)malloc(4 * sizeof(unsigned char));
+  // iterate over the row and store each value in the new position
   for (int i = 0; i < 4; i++) {
     int j = i - shift;
+    // wrap around incase i < shift
     if (j < 0) {
       j += 4;
     }
-    // make sure shifting works in both directions
+    // wrap around if j > row height, make sure shifting works in both directions
     j %= 4;
     shifted_row[j] = block[row + i * 4];
   }
+  // store shifted rows in the original buffer
   for (int i = 0; i < 4; i++) {
     block[row + i * 4] = shifted_row[i];
   }
 }
 
+/*
+ * Utilise shift_row function to perform the shift_rows step of the encryption
+ */
 void shift_rows(unsigned char *block) {
+  // row with index zero is not shifted
   shift_row(block, 1, 1);
   shift_row(block, 2, 2);
   shift_row(block, 3, 3);
 }
 
-unsigned char *extract_column(unsigned char *block, int col, int block_width, int column_height) {
-  unsigned char *column = (unsigned char *)malloc(column_height * sizeof(unsigned char));
-  for (int i = 0; i < column_height; i++) {
-    column[i] = block[col + i * block_width];
-  }
-  return column;
-}
-
-void insert_column(unsigned char *block, unsigned char *column, int col, int block_width, int column_height) {
-  for (int i = 0; i < column_height; i++) {
-    block[col + i * block_width] = column[i];
-  }
-}
-
+/*
+ * This function performs the xor operation used in the mix_columns step.
+ * This is a direct translation from the Python implementation
+ */
 unsigned char xtime(unsigned char x) {
   if (x & 0x80) {
     return ((x << 1) ^ 0x1B) & 0xFF;
@@ -107,6 +127,10 @@ unsigned char xtime(unsigned char x) {
   }
 }
 
+/*
+ * Performs the mix_columns step for a single column during encryption
+ * This is a direct translation from the Python implementation
+ */
 void mix_single_column(unsigned char *column) {
   unsigned char t = column[0] ^ column[1] ^ column[2] ^ column[3];
   unsigned char u = column[0];
@@ -116,6 +140,10 @@ void mix_single_column(unsigned char *column) {
   column[3] ^= t ^ xtime(column[3] ^ u);
 }
 
+/*
+ * Iterate over all columns, extract each and pass them to the mix_single_column
+ * function. The result is then copied back onto the block.
+ */
 void mix_columns(unsigned char *block) {
   for (int i = 0; i < 4; i++) {
     unsigned char *col = &block[i * 4];
@@ -127,6 +155,10 @@ void mix_columns(unsigned char *block) {
 /*
  * Operations used when decrypting a block
  */
+
+/*
+ * Uses the inv_s_box data to invert the byte subsitution when decrypting a block
+ */
 void invert_sub_bytes(unsigned char *block) {
   for (int i = 0; i < 16; i++) {
     unsigned char c = block[i];
@@ -137,12 +169,18 @@ void invert_sub_bytes(unsigned char *block) {
   }
 }
 
+/*
+ * Use the shift_row function to invert the shift when decrypting a block
+ */
 void invert_shift_rows(unsigned char *block) {
   shift_row(block, 1, -1);
   shift_row(block, 2, -2);
   shift_row(block, 3, -3);
 }
 
+/*
+ * Invert the mix_column step for decryption
+ */
 void invert_mix_columns(unsigned char *block) {
   for (int i = 0; i < 4; i++) {
     unsigned char *column = &block[i * 4];
@@ -158,7 +196,7 @@ void invert_mix_columns(unsigned char *block) {
 }
 
 /*
- * This operation is shared between encryption and decryption
+ * Adds the given round key to the given block by XORing each byte
  */
 void add_round_key(unsigned char *block, unsigned char *round_key) {
   for (int i = 0; i < 16; i++) {
@@ -166,11 +204,9 @@ void add_round_key(unsigned char *block, unsigned char *round_key) {
   }
 }
 
-unsigned char rcon[32] = {
-    0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1B, 0x36, 0x6C, 0xD8, 0xAB, 0x4D, 0x9A,
-    0x2F, 0x5E, 0xBC, 0x63, 0xC6, 0x97, 0x35, 0x6A, 0xD4, 0xB3, 0x7D, 0xFA, 0xEF, 0xC5, 0x91, 0x39,
-};
-
+/*
+ * Performs the word rotation during key expansion
+ */
 unsigned char *rot_word(unsigned char *word) {
   unsigned char *rotated_word = (unsigned char *)malloc(4 * sizeof(unsigned char));
   rotated_word[0] = word[1];
@@ -189,9 +225,9 @@ unsigned char *xor_bytes(const unsigned char *a, const unsigned char *b, int len
 }
 
 /*
- * This function should expand the round key. Given an input,
- * which is a single 128-bit key, it should return a 176-byte
- * vector, containing the 11 round keys one after the other
+ * This function expands all round keys. Given a 128-bit key, it returns a
+ * 176-byte block, containing the original key and the 10 round keys one after
+ * the other.
  */
 unsigned char *expand_key(unsigned char *cipher_key) {
   unsigned short num_rounds = 10;
@@ -199,9 +235,11 @@ unsigned char *expand_key(unsigned char *cipher_key) {
   memcpy(round_keys, cipher_key, 16);
   for (int i = 16; i < (num_rounds * 16) + 16; i += 4) {
     unsigned char *word = (unsigned char *)malloc(4 * sizeof(unsigned char));
-    unsigned char *w1 = &round_keys[i - 4];
-    unsigned char *w4 = &round_keys[i - 16];
-    memcpy(word, w1, 4);
+    unsigned char *w1 = &round_keys[i - 4];   // column at w - 1
+    unsigned char *w4 = &round_keys[i - 16];  // column at w - 4
+    memcpy(word, w1, 4);                      // copy the value of the previous column into the current column
+    // if the column is at the start of a block, rotate the word
+    // subsitute bytes and xor it with the correct round constant
     if (i % 16 == 0) {
       unsigned char *rot_w1 = rot_word(w1);
       for (int j = 0; j < 4; j++) {
@@ -212,28 +250,34 @@ unsigned char *expand_key(unsigned char *cipher_key) {
         rot_w1[j] = sub;
       }
       rot_w1[0] ^= rcon[i / 16];
-      word = rot_w1;
+      word = rot_w1;  // replace the original word with the modified one for further processing
     }
-    unsigned char *xored_word = xor_bytes(word, w4, 4);
-    memcpy(&round_keys[i], xored_word, 4);
+    unsigned char *xored_word =
+        xor_bytes(word, w4, 4);             // xor the column with the same column of the previous block
+    memcpy(&round_keys[i], xored_word, 4);  // copy the processed word to the current column of the key block
   }
   return round_keys;
 }
 
 /*
- * The implementations of the functions declared in the
- * header file should go here
+ * This function encrypts one block (16 bytes) of data with a given, 16 byte key
+ * using the AES (Rijndael) algorithm. The output is 16 bytes of encrypted data.
  */
 unsigned char *aes_encrypt_block(unsigned char *plaintext, unsigned char *key) {
+  // allocate memory for output and round keys
   unsigned char *output = (unsigned char *)malloc(sizeof(unsigned char) * BLOCK_SIZE);
   unsigned char *round_keys = expand_key(key);
+
+  // store the plaintext in the output buffer where it will be encrypted
   memcpy(output, plaintext, 16);
+
+  // perform the encryption steps with a total of 10 rounds
   add_round_key(output, round_keys);
   for (int i = 1; i < 10; i++) {
     sub_bytes(output);
     shift_rows(output);
     mix_columns(output);
-    add_round_key(output, &round_keys[i * 16]);
+    add_round_key(output, &round_keys[i * 16]);  // each round has a different key
   }
   sub_bytes(output);
   shift_rows(output);
@@ -241,10 +285,20 @@ unsigned char *aes_encrypt_block(unsigned char *plaintext, unsigned char *key) {
   return output;
 }
 
+/*
+ * This function decrypts one block (16 bytes) of cyphertext with a given, 16 byte key
+ * using the AES (Rijndael) algorithm. The output is 16 bytes of decrypted data.
+ */
 unsigned char *aes_decrypt_block(unsigned char *ciphertext, unsigned char *key) {
+  // allocate memory for output and round keys
   unsigned char *output = (unsigned char *)malloc(sizeof(unsigned char) * BLOCK_SIZE);
   unsigned char *round_keys = expand_key(key);
+
+  // store the cyphertext in the output buffer where it will be decrypted
   memcpy(output, ciphertext, 16);
+
+  // perform the decryption steps using the inverted functions
+  // the round keys are added in reverse order
   add_round_key(output, &round_keys[160]);
   invert_shift_rows(output);
   invert_sub_bytes(output);
