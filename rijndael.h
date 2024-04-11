@@ -1,6 +1,7 @@
 /*
- * TODO: Add your name and student number here, along with
- *       a brief description of this code.
+ *           Name: Andreas Kraus
+ * Student Number: D23125112
+ *
  */
 
 #ifndef RIJNDAEL_H
