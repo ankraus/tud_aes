@@ -71,7 +71,7 @@ unsigned char rcon[32] = {
  * the x position in the s_box and the last four bits denoting the y position
  */
 void sub_bytes(unsigned char *block) {
-  for (int i = 0; i < 16; i++) {
+  for (int i = 0; i < BLOCK_SIZE; i++) {
     unsigned char c = block[i];
     unsigned char x = c >> 4;   // access first four bits
     unsigned char y = c & 0xF;  // access last four bits
@@ -87,21 +87,21 @@ void sub_bytes(unsigned char *block) {
  */
 void shift_row(unsigned char *block, int row, int shift) {
   // allocate memory to store shifted row
-  unsigned char *shifted_row = (unsigned char *)malloc(4 * sizeof(unsigned char));
+  unsigned char *shifted_row = (unsigned char *)malloc(ROW_WIDTH * sizeof(unsigned char));
   // iterate over the row and store each value in the new position
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < ROW_WIDTH; i++) {
     int j = i - shift;
     // wrap around incase i < shift
     if (j < 0) {
-      j += 4;
+      j += ROW_WIDTH;
     }
     // wrap around if j > row height, make sure shifting works in both directions
-    j %= 4;
-    shifted_row[j] = block[row + i * 4];
+    j %= ROW_WIDTH;
+    shifted_row[j] = block[row + i * ROW_WIDTH];
   }
   // store shifted rows in the original buffer
-  for (int i = 0; i < 4; i++) {
-    block[row + i * 4] = shifted_row[i];
+  for (int i = 0; i < ROW_WIDTH; i++) {
+    block[row + i * ROW_WIDTH] = shifted_row[i];
   }
 }
 
@@ -110,9 +110,9 @@ void shift_row(unsigned char *block, int row, int shift) {
  */
 void shift_rows(unsigned char *block) {
   // row with index zero is not shifted
-  shift_row(block, 1, 1);
-  shift_row(block, 2, 2);
-  shift_row(block, 3, 3);
+  for (int i = 1; i < COLUMN_HEIGHT; i++) {
+    shift_row(block, i, i);
+  }
 }
 
 /*
@@ -145,10 +145,10 @@ void mix_single_column(unsigned char *column) {
  * function. The result is then copied back onto the block.
  */
 void mix_columns(unsigned char *block) {
-  for (int i = 0; i < 4; i++) {
-    unsigned char *col = &block[i * 4];
+  for (int i = 0; i < ROW_WIDTH; i++) {
+    unsigned char *col = &block[i * COLUMN_HEIGHT];
     mix_single_column(col);
-    memcpy(&block[i * 4], col, 4);
+    memcpy(&block[i * COLUMN_HEIGHT], col, COLUMN_HEIGHT);
   }
 }
 
@@ -160,7 +160,7 @@ void mix_columns(unsigned char *block) {
  * Uses the inv_s_box data to invert the byte subsitution when decrypting a block
  */
 void invert_sub_bytes(unsigned char *block) {
-  for (int i = 0; i < 16; i++) {
+  for (int i = 0; i < BLOCK_SIZE; i++) {
     unsigned char c = block[i];
     unsigned char x = c >> 4;
     unsigned char y = c & 0xF;
@@ -173,24 +173,24 @@ void invert_sub_bytes(unsigned char *block) {
  * Use the shift_row function to invert the shift when decrypting a block
  */
 void invert_shift_rows(unsigned char *block) {
-  shift_row(block, 1, -1);
-  shift_row(block, 2, -2);
-  shift_row(block, 3, -3);
+  for (int i = 1; i < COLUMN_HEIGHT; i++) {
+    shift_row(block, i, -i);
+  }
 }
 
 /*
  * Invert the mix_column step for decryption
  */
 void invert_mix_columns(unsigned char *block) {
-  for (int i = 0; i < 4; i++) {
-    unsigned char *column = &block[i * 4];
+  for (int i = 0; i < COLUMN_HEIGHT; i++) {
+    unsigned char *column = &block[i * COLUMN_HEIGHT];
     unsigned char u = xtime(xtime(column[0] ^ column[2]));
     unsigned char v = xtime(xtime(column[1] ^ column[3]));
     column[0] ^= u;
     column[1] ^= v;
     column[2] ^= u;
     column[3] ^= v;
-    memcpy(&block[i * 4], column, 4);
+    memcpy(&block[i * COLUMN_HEIGHT], column, COLUMN_HEIGHT);
   }
   mix_columns(block);
 }
@@ -199,7 +199,7 @@ void invert_mix_columns(unsigned char *block) {
  * Adds the given round key to the given block by XORing each byte
  */
 void add_round_key(unsigned char *block, unsigned char *round_key) {
-  for (int i = 0; i < 16; i++) {
+  for (int i = 0; i < BLOCK_SIZE; i++) {
     block[i] ^= round_key[i];
   }
 }
@@ -208,14 +208,16 @@ void add_round_key(unsigned char *block, unsigned char *round_key) {
  * Performs the word rotation during key expansion
  */
 unsigned char *rot_word(unsigned char *word) {
-  unsigned char *rotated_word = (unsigned char *)malloc(4 * sizeof(unsigned char));
-  rotated_word[0] = word[1];
-  rotated_word[1] = word[2];
-  rotated_word[2] = word[3];
-  rotated_word[3] = word[0];
+  unsigned char *rotated_word = (unsigned char *)malloc(COLUMN_HEIGHT * sizeof(unsigned char));
+  for (int i = 0; i < COLUMN_HEIGHT; i++) {
+    rotated_word[i] = word[(i + 1) % COLUMN_HEIGHT];
+  }
   return rotated_word;
 }
 
+/*
+ * XORs the bytes of two unsigned char buffers one by one and returns a resulting buffer
+ */
 unsigned char *xor_bytes(const unsigned char *a, const unsigned char *b, int length) {
   unsigned char *result = malloc(length);
   for (int i = 0; i < length; i++) {
@@ -230,31 +232,31 @@ unsigned char *xor_bytes(const unsigned char *a, const unsigned char *b, int len
  * the other.
  */
 unsigned char *expand_key(unsigned char *cipher_key) {
-  unsigned short num_rounds = 10;
-  unsigned char *round_keys = (unsigned char *)malloc(16 * (num_rounds + 1) * sizeof(unsigned char));
-  memcpy(round_keys, cipher_key, 16);
-  for (int i = 16; i < (num_rounds * 16) + 16; i += 4) {
-    unsigned char *word = (unsigned char *)malloc(4 * sizeof(unsigned char));
-    unsigned char *w1 = &round_keys[i - 4];   // column at w - 1
-    unsigned char *w4 = &round_keys[i - 16];  // column at w - 4
-    memcpy(word, w1, 4);                      // copy the value of the previous column into the current column
+  unsigned char *round_keys = (unsigned char *)malloc(BLOCK_SIZE * (ROUNDS + 1) * sizeof(unsigned char));
+  memcpy(round_keys, cipher_key, BLOCK_SIZE);
+  for (int i = BLOCK_SIZE; i < (ROUNDS * BLOCK_SIZE) + BLOCK_SIZE; i += COLUMN_HEIGHT) {
+    unsigned char *word = (unsigned char *)malloc(COLUMN_HEIGHT * sizeof(unsigned char));
+    unsigned char *w1 = &round_keys[i - COLUMN_HEIGHT];  // column at w - 1
+    unsigned char *w4 = &round_keys[i - BLOCK_SIZE];     // column at w - 4
+    memcpy(word, w1, COLUMN_HEIGHT);  // copy the value of the previous column into the current column
     // if the column is at the start of a block, rotate the word
     // subsitute bytes and xor it with the correct round constant
-    if (i % 16 == 0) {
+    if (i % BLOCK_SIZE == 0) {
       unsigned char *rot_w1 = rot_word(w1);
-      for (int j = 0; j < 4; j++) {
+      for (int j = 0; j < COLUMN_HEIGHT; j++) {
         unsigned char c = rot_w1[j];
         unsigned char x = c >> 4;
         unsigned char y = c & 0xF;
         unsigned char sub = s_box[x][y];
         rot_w1[j] = sub;
       }
-      rot_w1[0] ^= rcon[i / 16];
+      rot_w1[0] ^= rcon[i / BLOCK_SIZE];
       word = rot_w1;  // replace the original word with the modified one for further processing
     }
     unsigned char *xored_word =
-        xor_bytes(word, w4, 4);             // xor the column with the same column of the previous block
-    memcpy(&round_keys[i], xored_word, 4);  // copy the processed word to the current column of the key block
+        xor_bytes(word, w4, COLUMN_HEIGHT);  // xor the column with the same column of the previous block
+    memcpy(&round_keys[i], xored_word,
+           COLUMN_HEIGHT);  // copy the processed word to the current column of the key block
   }
   return round_keys;
 }
@@ -269,19 +271,19 @@ unsigned char *aes_encrypt_block(unsigned char *plaintext, unsigned char *key) {
   unsigned char *round_keys = expand_key(key);
 
   // store the plaintext in the output buffer where it will be encrypted
-  memcpy(output, plaintext, 16);
+  memcpy(output, plaintext, BLOCK_SIZE);
 
   // perform the encryption steps with a total of 10 rounds
   add_round_key(output, round_keys);
-  for (int i = 1; i < 10; i++) {
+  for (int i = 1; i < ROUNDS; i++) {
     sub_bytes(output);
     shift_rows(output);
     mix_columns(output);
-    add_round_key(output, &round_keys[i * 16]);  // each round has a different key
+    add_round_key(output, &round_keys[i * BLOCK_SIZE]);  // each round has a different key
   }
   sub_bytes(output);
   shift_rows(output);
-  add_round_key(output, &round_keys[160]);
+  add_round_key(output, &round_keys[BLOCK_SIZE * ROUNDS]);
   return output;
 }
 
@@ -295,15 +297,15 @@ unsigned char *aes_decrypt_block(unsigned char *ciphertext, unsigned char *key) 
   unsigned char *round_keys = expand_key(key);
 
   // store the cyphertext in the output buffer where it will be decrypted
-  memcpy(output, ciphertext, 16);
+  memcpy(output, ciphertext, BLOCK_SIZE);
 
   // perform the decryption steps using the inverted functions
   // the round keys are added in reverse order
-  add_round_key(output, &round_keys[160]);
+  add_round_key(output, &round_keys[BLOCK_SIZE * ROUNDS]);
   invert_shift_rows(output);
   invert_sub_bytes(output);
-  for (int i = 9; i > 0; i--) {
-    add_round_key(output, &round_keys[i * 16]);
+  for (int i = ROUNDS - 1; i > 0; i--) {
+    add_round_key(output, &round_keys[i * BLOCK_SIZE]);
     invert_mix_columns(output);
     invert_shift_rows(output);
     invert_sub_bytes(output);
